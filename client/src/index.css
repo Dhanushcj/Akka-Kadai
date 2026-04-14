@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold-primary: #D4AF37;
+  --color-gold-secondary: #B8860B;
+  --color-dark-bg: #121212;
+  --color-dark-card: #1E1E1E;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-dark-bg);
+}

@@ -1,0 +1,28 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.env
+
+# Build
+dist/
+build/
+.vite/
+
+# Database
+server/data.json
+# (Note: I'm ignoring the actual database file to keep the repo clean of customer data, 
+# but I will include a template/dummy if needed in the server folder)
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.bak
+
+# Logs
+logs/
+*.log
