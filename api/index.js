@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -13,10 +12,11 @@ app.use(bodyParser.json());
 // MongoDB Connection with robust error handling for Serverless
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-    console.warn('WARNING: MONGODB_URI is not defined. Backend will not function correctly.');
-} else {
-    mongoose.connect(MONGODB_URI)
+// We connect outside the handler for connection pooling in Vercel
+if (MONGODB_URI) {
+    mongoose.connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000 
+    })
       .then(() => console.log('Connected to MongoDB Atlas'))
       .catch(err => console.error('MongoDB connection error:', err));
 }
@@ -54,7 +54,18 @@ const calculateInterest = (amount, rate, startDate, endDate = new Date()) => {
     return parseFloat(interest.toFixed(2));
 };
 
-// API Routes
+// --- API Routes ---
+
+// Important diagnostic route
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'online', 
+        time: new Date().toISOString(),
+        dbConnected: mongoose.connection.readyState === 1,
+        engine: 'Vercel Serverless'
+    });
+});
+
 app.get('/api/loans', async (req, res) => {
     try {
         if (!mongoose.connection.readyState) throw new Error('Database not connected');
@@ -140,14 +151,4 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
-// Serve Static Files for Production
-const publicPath = path.join(__dirname, '../client/dist');
-app.use(express.static(publicPath));
-
-// Fallback to React app
-app.get('*', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-// For Vercel, we export the app
 module.exports = app;
