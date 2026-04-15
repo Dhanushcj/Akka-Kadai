@@ -31,6 +31,7 @@ const loanSchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: String, required: true },
     weight: Number,
+    stoneWastage: { type: Number, default: 0 },
     purity: String,
     ornamentType: { type: String, default: 'Necklace' },
     amount: Number,
@@ -53,21 +54,119 @@ const loanSchema = new mongoose.Schema({
 
 const Loan = mongoose.model('Loan', loanSchema);
 
+// Settings Schema
+const settingsSchema = new mongoose.Schema({
+    id: { type: String, default: 'global' },
+    password: { type: String, default: 'admin123' },
+    ratePerGram: { type: Number, default: 7000 }
+});
+const Settings = mongoose.model('Settings', settingsSchema);
+
 // Helper: Calculate interest
 const calculateInterest = (amount, rate, startDate, endDate = new Date()) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
+    if (end <= start) return 0;
     const diffTime = Math.abs(end - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    const monthlyRate = rate / 100;
-    const months = diffDays / 30;
-    const interest = amount * monthlyRate * months;
+    // (Amount * (Rate * 12 / 100)) / 365 -> Round -> Multiply by Days
+    const dailyInterest = Math.round((amount * (rate * 12 / 100)) / 365);
+    return dailyInterest * diffDays;
+};
+
+const getLoanState = (loan, targetDate = new Date()) => {
+    let currentPrincipal = loan.amount;
+    let interestDue = 0;
+    let lastEventDate = new Date(loan.date);
     
-    return parseFloat(interest.toFixed(2));
+    // Sort payments by date
+    const sortedPayments = [...(loan.payments || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    for (const payment of sortedPayments) {
+        const payDate = new Date(payment.date);
+        if (payDate > targetDate) break;
+        
+        // Calculate interest accrued until this payment
+        const accrued = calculateInterest(currentPrincipal, loan.interest, lastEventDate, payDate);
+        interestDue += accrued;
+        
+        // Apply payment: Interest first, then Principal
+        if (payment.amount >= interestDue) {
+            const principalReduction = payment.amount - interestDue;
+            interestDue = 0;
+            currentPrincipal = Math.max(0, currentPrincipal - principalReduction);
+        } else {
+            interestDue -= payment.amount;
+        }
+        
+        lastEventDate = payDate;
+    }
+    
+    // Calculate final interest from last event to target date
+    const finalAccrued = calculateInterest(currentPrincipal, loan.interest, lastEventDate, targetDate);
+    interestDue += finalAccrued;
+    
+    return {
+        currentPrincipal: parseFloat(currentPrincipal.toFixed(2)),
+        interestDue: parseFloat(interestDue.toFixed(2)),
+        outstanding: parseFloat((currentPrincipal + interestDue).toFixed(2))
+    };
 };
 
 // --- API Routes ---
+
+app.post('/api/login', async (req, res) => {
+    try {
+        await connectDB();
+        let settings = await Settings.findOne({ id: 'global' });
+        if (!settings) settings = await (new Settings({})).save();
+        
+        if (req.body.password === settings.password) {
+            res.json({ success: true, ratePerGram: settings.ratePerGram });
+        } else {
+            res.status(401).json({ success: false, message: 'Invalid password' });
+        }
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.get('/api/settings', async (req, res) => {
+    try {
+        await connectDB();
+        let settings = await Settings.findOne({ id: 'global' });
+        if (!settings) settings = await (new Settings({})).save();
+        res.json({ ratePerGram: settings.ratePerGram });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.post('/api/settings', async (req, res) => {
+    try {
+        await connectDB();
+        const { currentPassword, newPassword, ratePerGram } = req.body;
+        let settings = await Settings.findOne({ id: 'global' });
+        if (!settings) settings = await (new Settings({})).save();
+        
+        if (newPassword) {
+            if (settings.password !== currentPassword) {
+                return res.status(401).json({ message: 'Incorrect current password' });
+            }
+            settings.password = newPassword;
+        }
+        
+        if (ratePerGram !== undefined) {
+            settings.ratePerGram = ratePerGram;
+        }
+
+        await settings.save();
+        res.json({ success: true, ratePerGram: settings.ratePerGram });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
 
 // Important diagnostic route
 app.get('/api/health', (req, res) => {
@@ -92,7 +191,7 @@ app.get('/api/loans', async (req, res) => {
 app.post('/api/loans', async (req, res) => {
     try {
         await connectDB();
-        const { name, phone, weight, purity, ornamentType, amount, interest, date, goldPhoto, customerPhoto } = req.body;
+        const { name, phone, weight, stoneWastage, purity, ornamentType, amount, interest, date, goldPhoto, customerPhoto } = req.body;
         
         const lastLoan = await Loan.findOne().sort({ date: -1 });
         let lastIdNum = 1000;
@@ -109,7 +208,7 @@ app.post('/api/loans', async (req, res) => {
 
         const newLoan = new Loan({
             id: nextId,
-            name, phone, weight, purity, ornamentType: ornamentType || 'Necklace', amount, interest,
+            name, phone, weight, stoneWastage: stoneWastage || 0, purity, ornamentType: ornamentType || 'Necklace', amount, interest,
             date: loanDate,
             dueDate: dueDate,
             goldPhoto: goldPhoto || null,
@@ -131,16 +230,13 @@ app.put('/api/loans/:id/release', async (req, res) => {
         if (loan.status === 'Closed') return res.status(400).json({ message: 'Loan already closed' });
 
         const releasedDate = new Date();
-        const accruedInterest = calculateInterest(loan.amount, loan.interest, loan.date, releasedDate);
+        const state = getLoanState(loan, releasedDate);
         
-        // Account for partial payments already made
-        const totalPaidSoFar = (loan.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-        const netInterestToPay = Math.max(0, accruedInterest - totalPaidSoFar);
-
         loan.status = 'Closed';
         loan.releasedDate = releasedDate;
-        loan.finalInterest = accruedInterest; // Total interest for the whole period
-        loan.totalPaid = loan.amount + netInterestToPay + totalPaidSoFar; // Principal + Actual Interest Paid
+        loan.finalInterest = state.interestDue; 
+        loan.totalPaid = (loan.totalPaid || 0) + state.outstanding; 
+        loan.amount = state.currentPrincipal;
 
         const updatedLoan = await loan.save();
         res.json(updatedLoan);

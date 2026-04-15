@@ -1,7 +1,52 @@
 import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 
-const API_BASE = '/api'
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const calculateInterest = (amount, rate, startDate, endDate = new Date()) => {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (end <= start) return 0
+  const diffTime = Math.abs(end - start)
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const dailyInterest = Math.round((amount * (rate * 12 / 100)) / 365)
+  return dailyInterest * diffDays
+}
+
+const getLoanState = (loan, targetDate = new Date()) => {
+  let currentPrincipal = loan.amount
+  let interestDue = 0
+  let lastEventDate = new Date(loan.date)
+  
+  const sortedPayments = [...(loan.payments || [])].sort((a, b) => new Date(a.date) - new Date(b.date))
+  
+  for (const payment of sortedPayments) {
+    const payDate = new Date(payment.date)
+    if (payDate > targetDate) break
+    
+    const accrued = calculateInterest(currentPrincipal, loan.interest, lastEventDate, payDate)
+    interestDue += accrued
+    
+    if (payment.amount >= interestDue) {
+      const principalReduction = payment.amount - interestDue
+      interestDue = 0
+      currentPrincipal = Math.max(0, currentPrincipal - principalReduction)
+    } else {
+      interestDue -= payment.amount
+    }
+    lastEventDate = payDate
+  }
+  
+  const finalAccrued = calculateInterest(currentPrincipal, loan.interest, lastEventDate, targetDate)
+  interestDue += finalAccrued
+  
+  return {
+    currentPrincipal,
+    interestDue,
+    outstanding: currentPrincipal + interestDue
+  }
+}
 
 // ─── Receipt / PDF Generator ─────────────────────────────────────────────────
 const printReceipt = (loan, type, paymentData = null) => {
@@ -12,12 +57,12 @@ const printReceipt = (loan, type, paymentData = null) => {
   const cur = (n) => '\u20b9' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
 
   const today    = new Date()
-  const loanDate = new Date(loan.date)
   const refDate  = loan.releasedDate ? new Date(loan.releasedDate) : today
-  const diffDays = Math.ceil(Math.abs(refDate - loanDate) / (1000 * 60 * 60 * 24))
-  const months   = diffDays / 30
-  const accrued  = parseFloat((loan.amount * (loan.interest / 100) * months).toFixed(2))
-  const totalDue = loan.amount + accrued
+  const state    = getLoanState(loan, refDate)
+  
+  const totalDue = state.outstanding
+  const accrued  = state.interestDue
+  const currentPrincipal = state.currentPrincipal
 
   const custPhotoHtml = loan.customerPhoto
     ? `<img src="${loan.customerPhoto}" style="width:100%;height:100%;object-fit:cover" />`
@@ -75,10 +120,11 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#eee}
 ${['CUSTOMER', 'OFFICE'].map((copyType, index) => `
 <div class="page" ${index === 1 ? 'style="border-style: dashed;"' : ''}>
 <table class="hdr-t"><tr>
-  <td style="width:68px;padding:4px 10px 4px 0;vertical-align:middle"><div class="logo-box">S</div></td>
+  <td style="width:68px;padding:4px 10px 4px 0;vertical-align:middle"><div class="logo-box">V</div></td>
   <td style="vertical-align:middle;padding:4px 0">
-    <div class="shop-nm">SUSH'S GOLD VAULT</div>
-    <div class="shop-sub">Gold Pawn &amp; Loan Services &bull; Trusted Since Inception</div>
+    <div class="shop-nm">Sri Vishnu Madha Nagai Adagu Kadai</div>
+    <div class="shop-sub">Vaiyampatti Road, Irumathur, Karimangalam, Dharmapuri-635201</div>
+    <div class="shop-sub" style="font-style: normal; color: #333; font-weight: 700;">Contact: 7339638249, 8270774080</div>
   </td>
   <td style="text-align:right;vertical-align:middle;padding-right:4px;font-size:10px">
     <div style="font-size:11px;font-weight:700">GOLD LOAN RECEIPT</div>
@@ -143,8 +189,8 @@ ${['CUSTOMER', 'OFFICE'].map((copyType, index) => `
   <tbody><tr>
     <td>${loan.ornamentType || 'Gold Jewellery'} &mdash; ${loan.purity} Purity</td>
     <td>${loan.weight}</td>
-    <td>&mdash;</td>
-    <td>${loan.weight}</td>
+    <td>${loan.stoneWastage || 0}</td>
+    <td>${(parseFloat(loan.weight) - parseFloat(loan.stoneWastage || 0)).toFixed(2)}</td>
   </tr></tbody>
 </table>
 <div class="terms">
@@ -158,9 +204,9 @@ ${['CUSTOMER', 'OFFICE'].map((copyType, index) => `
 </div>
 <div class="sig-row">
   <div class="sig-blk"><div class="sig-ln">Signature of the Borrower</div><div style="font-size:10px;color:#555;margin-top:2px">${loan.name}</div></div>
-  <div class="sig-blk"><div class="sig-ln">Signature of Branch Manager</div><div style="font-size:10px;color:#555;margin-top:2px">Sush's Gold Vault</div></div>
+  <div class="sig-blk"><div class="sig-ln">Signature of Branch Manager</div><div style="font-size:10px;color:#555;margin-top:2px">Sri Vishnu Madha Nagai Adagu Kadai</div></div>
 </div>
-<div class="footer2">Sush's Gold Vault &bull; Gold Pawn &amp; Loan Services &bull; Receipt No: ${loan.id} &bull; &copy; ${new Date().getFullYear()}</div>
+<div class="footer2">Sri Vishnu Madha Nagai Adagu Kadai &bull; Vaiyampatti Road, Irumathur &bull; Contact: 7339638249 &bull; &copy; ${new Date().getFullYear()}</div>
 </div>
 ${index === 0 ? '<div class="cut-line"></div>' : ''}
 `).join('')}
@@ -205,9 +251,10 @@ ${index === 0 ? '<div class="cut-line"></div>' : ''}
 </style></head><body>
 ${type==='settlement'?'<div class="settled-stamp">SETTLED</div>':''}
 <div class="page">
-<div class="hdr"><div><div class="logo">S</div></div>
-  <div class="shop">SUSH'S GOLD VAULT</div>
-  <div class="tagline">Gold Pawn &amp; Loan Services &bull; Trusted Since Inception</div>
+<div class="hdr"><div><div class="logo">V</div></div>
+  <div class="shop">Sri Vishnu Madha</div>
+  <div class="tagline">Nagai Adagu Kadai &bull; Vaiyampatti Road, Irumathur</div>
+  <div class="tagline" style="color: #333; font-weight: 700;">Tel: 7339638249, 8270774080</div>
   <div class="rtitle">${titles[type]}</div>
 </div>
 <div class="meta">
@@ -216,6 +263,9 @@ ${type==='settlement'?'<div class="settled-stamp">SETTLED</div>':''}
   <div><div class="ml">Loan Date</div><div class="mv">${fmt(loan.date)}</div></div>
   <div><div class="ml">Due Date</div><div class="mv">${fmt(loan.dueDate)}</div></div>
   <div><div class="ml">Status</div><div class="mv"><span class="${loan.status==='Active'?'badge-a':'badge-c'}">${loan.status}</span></div></div>
+  <div><div class="ml">Principal</div><div class="mv">${cur(currentPrincipal)}</div></div>
+  <div><div class="ml">Interest Due</div><div class="mv">${cur(accrued)}</div></div>
+  <div><div class="ml">Outstanding</div><div class="mv">${cur(totalDue)}</div></div>
   <div><div class="ml">Print Date</div><div class="mv">${fmt(today)}</div></div>
 </div>
 <div class="sec"><div class="sec-title">Customer Details</div><div class="grid2">
@@ -225,7 +275,9 @@ ${type==='settlement'?'<div class="settled-stamp">SETTLED</div>':''}
 <div class="sec"><div class="sec-title">Pledge / Collateral Details</div><div class="grid2">
   <div class="cell"><div class="cl">Ornament Type</div><div class="cv">${loan.ornamentType||'Gold Jewellery'}</div></div>
   <div class="cell"><div class="cl">Purity</div><div class="cv">${loan.purity}</div></div>
-  <div class="cell"><div class="cl">Net Weight</div><div class="cv">${loan.weight} g</div></div>
+  <div class="cell"><div class="cl">Gross Weight</div><div class="cv">${loan.weight} g</div></div>
+  <div class="cell"><div class="cl">Stone/Wastage</div><div class="cv">${loan.stoneWastage || 0} g</div></div>
+  <div class="cell"><div class="cl">Net Weight</div><div class="cv">${(parseFloat(loan.weight) - parseFloat(loan.stoneWastage || 0)).toFixed(2)} g</div></div>
   <div class="cell"><div class="cl">Interest Rate</div><div class="cv">${loan.interest}% / month</div></div>
 </div></div>
 
@@ -235,31 +287,31 @@ ${type==='payment' && paymentData ? `
   <div class="amt-val">${cur(paymentData.amount)}</div>
   <div class="amt-sub">Received on: ${fmt(paymentData.date)} &bull; ${paymentData.description}</div>
 </div>
-<div class="sec">
-  <div class="sec-title">Payment Summary</div>
-  <table class="tbl">
-    <tr><td>Loan Principal</td><td>${cur(loan.amount)}</td></tr>
-    <tr><td>Interest Rate</td><td>${loan.interest}% / month</td></tr>
-    <tr><td>Payment Date</td><td>${fmt(paymentData.date)}</td></tr>
-    <tr class="tr-total"><td>Current Payment</td><td>${cur(paymentData.amount)}</td></tr>
-  </table>
-</div>
+  <div class="sec">
+    <div class="sec-title">Payment Summary</div>
+    <table class="tbl">
+      <tr><td>Loan Principal (Before)</td><td>${cur(loan.amount)}</td></tr>
+      <tr><td>Current Balance Due</td><td>${cur(totalDue + (paymentData.amount || 0))}</td></tr>
+      <tr><td>Interest Rate</td><td>${loan.interest}% / month</td></tr>
+      <tr><td>Payment Date</td><td>${fmt(paymentData.date)}</td></tr>
+      <tr class="tr-total"><td>Payment Received</td><td>${cur(paymentData.amount)}</td></tr>
+      <tr class="tr-total"><td>New Balance Due</td><td>${cur(totalDue)}</td></tr>
+    </table>
+  </div>
 ` : ''}
 
-${type==='interest'?`
+${type === 'interest' ? `
 <div class="sec"><div class="sec-title">Interest Statement &mdash; As of ${fmt(today)}</div>
 <table class="tbl">
-  <tr><td>Principal Amount</td><td>${cur(loan.amount)}</td></tr>
+  <tr><td>Current Principal</td><td>${cur(currentPrincipal)}</td></tr>
   <tr><td>Interest Rate</td><td>${loan.interest}% / month</td></tr>
-  <tr><td>Total Days Elapsed</td><td>${diffDays} days (${months.toFixed(1)} months)</td></tr>
   <tr><td>Total Interest Accrued</td><td>${cur(accrued)}</td></tr>
-  <tr><td>Total Paid So Far (Partial)</td><td style="color:#065f46">-${cur((loan.payments || []).reduce((s,p)=>s+(p.amount||0),0))}</td></tr>
-  <tr class="tr-total"><td>Net Amount Due to Close</td><td>${cur(Math.max(0, totalDue - (loan.payments || []).reduce((s,p)=>s+(p.amount||0),0)))}</td></tr>
+  <tr class="tr-total"><td>Net Amount Due to Close</td><td>${cur(totalDue)}</td></tr>
 </table></div>
 <div class="amt-box"><div class="amt-lbl">Current Balance Due to Close</div>
-  <div class="amt-val">${cur(Math.max(0, totalDue - (loan.payments || []).reduce((s,p)=>s+(p.amount||0),0)))}</div>
-  <div class="amt-sub">Principal ${cur(loan.amount)} + Net Unpaid Interest</div>
-</div>`:''}
+  <div class="amt-val">${cur(totalDue)}</div>
+  <div class="amt-sub">Principal ${cur(currentPrincipal)} + Accrued Interest</div>
+</div>` : ''}
 ${type==='settlement'?`
 <div class="sec"><div class="sec-title">Settlement Summary</div>
 <table class="tbl">
@@ -286,9 +338,9 @@ ${type==='settlement'?`
 </div>
 <div class="sigs">
   <div class="sig"><div class="sig-line">Customer Signature<br/><b>${loan.name}</b></div></div>
-  <div class="sig"><div class="sig-line">Authorised Signatory<br/><b>Sush's Gold Vault</b></div></div>
+  <div class="sig"><div class="sig-line">Authorised Signatory<br/><b>Sri Vishnu Madha Nagai Adagu Kadai</b></div></div>
 </div>
-<div class="footer">Computer-generated receipt &bull; Sush's Gold Vault &copy; ${new Date().getFullYear()} &bull; ${loan.id}</div>
+<div class="footer">Computer-generated receipt &bull; Sri Vishnu Madha &copy; ${new Date().getFullYear()} &bull; ${loan.id}</div>
 </div>
 <button class="print-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F Print / Save as PDF</button>
 </body></html>`
@@ -299,6 +351,11 @@ ${type==='settlement'?`
 }
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [loginUsername, setLoginUsername] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [ratePerGram, setRatePerGram] = useState(7000)
+
   const [activeTab, setActiveTab] = useState('dashboard')
   const [loans, setLoans] = useState([])
   const [stats, setStats] = useState({})
@@ -315,6 +372,7 @@ function App() {
     name: '',
     phone: '',
     weight: '',
+    stoneWastage: '',
     purity: '22K',
     ornamentType: 'Necklace',
     amount: '',
@@ -354,6 +412,13 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const netWeight = (parseFloat(formData.weight) || 0) - (parseFloat(formData.stoneWastage) || 0);
+    const eligibleAmount = Math.floor(netWeight * ratePerGram);
+    if (parseFloat(formData.amount) > eligibleAmount) {
+       alert(`Required Loan Amount cannot exceed Eligible Amount (₹${eligibleAmount.toLocaleString()})`);
+       return;
+    }
+
     try {
       await axios.post(`${API_BASE}/loans`, {
         ...formData,
@@ -364,6 +429,7 @@ function App() {
         name: '',
         phone: '',
         weight: '',
+        stoneWastage: '',
         purity: '22K',
         ornamentType: 'Necklace',
         amount: '',
@@ -376,7 +442,7 @@ function App() {
       alert('Loan Created Successfully!')
       setActiveTab('loans')
     } catch (err) {
-      alert('Error creating loan')
+      alert('Error creating loan: ' + (err.response?.data?.error || err.response?.data?.message || err.message))
     }
   }
 
@@ -441,8 +507,39 @@ function App() {
     { id: 'dashboard', label: 'Overview' },
     { id: 'new', label: 'New Loan' },
     { id: 'loans', label: 'Ledger' },
-    { id: 'customers', label: 'Customers' }
+    { id: 'customers', label: 'Customers' },
+    { id: 'settings', label: 'Settings' }
   ]
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-bg-main text-slate-100 flex items-center justify-center p-4">
+        <div className="bg-bg-surface border border-border-subtle p-8 rounded-3xl w-full max-w-sm shadow-xl text-center">
+          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/20">
+            <span className="text-bg-main font-black text-3xl">V</span>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Admin Login</h2>
+          <p className="text-slate-500 text-sm mb-6">Sri Vishnu Madha Nagai Adagu Kadai</p>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              const res = await axios.post(`${API_BASE}/login`, { password: loginPassword });
+              if (res.data.success) {
+                setRatePerGram(res.data.ratePerGram || 7000);
+                setIsLoggedIn(true);
+              }
+            } catch(err) {
+              alert(err.response?.data?.message || 'Invalid credentials');
+            }
+          }} className="space-y-4">
+            <input type="text" placeholder="Username" value={loginUsername} onChange={e => setLoginUsername(e.target.value)} className="w-full bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-3 outline-none focus:ring-2 focus:ring-primary/20" />
+            <input type="password" placeholder="Password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-3 outline-none focus:ring-2 focus:ring-primary/20" />
+            <button type="submit" className="w-full bg-primary text-bg-main font-bold py-3 mt-4 rounded-xl hover:brightness-110 transition-all uppercase tracking-widest text-sm shadow-lg shadow-primary/10">Login</button>
+          </form>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-bg-main text-slate-100 font-sans selection:bg-primary/30 selection:text-white pb-10">
@@ -450,10 +547,11 @@ function App() {
       <nav className="bg-bg-main/80 backdrop-blur-md border-b border-border-subtle sticky top-0 z-50 px-4 md:px-8 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/10">
-            <span className="text-bg-main font-bold text-lg">S</span>
+            <span className="text-bg-main font-bold text-lg">V</span>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">
-            Sush&apos;s Gold Vault
+          <h1 className="text-xl font-bold text-white tracking-tight flex flex-col justify-center">
+            <span className="leading-none">Sri Vishnu</span>
+            <span className="text-[10px] text-primary/80 uppercase tracking-widest mt-1 leading-none font-black">Madha Nagai Adagu Kadai</span>
           </h1>
         </div>
 
@@ -515,6 +613,7 @@ function App() {
             setGoldPhoto={setGoldPhoto}
             customerPhoto={customerPhoto}
             setCustomerPhoto={setCustomerPhoto}
+            ratePerGram={ratePerGram}
           />
         )}
         {activeTab === 'loans' && (
@@ -541,10 +640,13 @@ function App() {
             onViewLoans={(phone) => { setSelectedCustomer(phone); setActiveTab('loans'); }} 
           />
         )}
+        {activeTab === 'settings' && (
+          <SettingsMenu ratePerGram={ratePerGram} setRatePerGram={setRatePerGram} />
+        )}
       </main>
 
       <footer className="py-12 text-center text-slate-500 border-t border-border-subtle mt-12 bg-slate-950/20">
-        <p className="text-[10px] uppercase font-bold tracking-[0.2em]">© {new Date().getFullYear()} Sushmitha Akka Gold Shop • Professional Gold Services</p>
+        <p className="text-[10px] uppercase font-bold tracking-[0.2em]">© {new Date().getFullYear()} Sri Vishnu Madha Nagai Adagu Kadai • Vaiyampatti Road</p>
       </footer>
     </div>
   )
@@ -772,12 +874,22 @@ function PhotoCapture({ label, icon, photo, setPhoto, captureMode }) {
   )
 }
 
-function NewLoanForm({ formData, onChange, onSubmit, goldPhoto, setGoldPhoto, customerPhoto, setCustomerPhoto }) {
+function NewLoanForm({ formData, onChange, onSubmit, goldPhoto, setGoldPhoto, customerPhoto, setCustomerPhoto, ratePerGram }) {
+  const netWeight = (parseFloat(formData.weight) || 0) - (parseFloat(formData.stoneWastage) || 0);
+  const eligibleAmount = Math.floor(netWeight * ratePerGram);
+
   return (
     <div className="max-w-4xl mx-auto bg-bg-surface border border-border-subtle p-8 md:p-12 rounded-[2rem] shadow-xl animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <div className="mb-12">
-        <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">New Pledge Entry</h2>
-        <p className="text-slate-500 text-sm font-medium">Initialize loan terms and document collateral assets</p>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">New Pledge Entry</h2>
+          <p className="text-slate-500 text-sm font-medium">Initialize loan terms and document collateral assets</p>
+        </div>
+        <div className="bg-slate-900 border border-emerald-500/20 p-5 rounded-2xl md:min-w-[240px]">
+          <p className="text-[10px] uppercase font-bold tracking-widest text-emerald-500 mb-1">Eligible Loan Amount</p>
+          <p className="text-3xl font-black text-emerald-400">₹{eligibleAmount.toLocaleString()}</p>
+          <p className="text-slate-500 text-[9px] uppercase tracking-widest mt-2">{netWeight.toFixed(2)}g × ₹{ratePerGram}/g</p>
+        </div>
       </div>
       
       <form onSubmit={onSubmit} className="space-y-10">
@@ -785,9 +897,10 @@ function NewLoanForm({ formData, onChange, onSubmit, goldPhoto, setGoldPhoto, cu
           {[
             { label: 'Customer Name', name: 'name', type: 'text', placeholder: 'Enter full name' },
             { label: 'Mobile Number', name: 'phone', type: 'tel', placeholder: '10-digit mobile' },
-            { label: 'Gold Weight (g)', name: 'weight', type: 'number', placeholder: '0.00', step: '0.01' },
+            { label: 'Gross Weight (g)', name: 'weight', type: 'number', placeholder: '0.00', step: '0.01' },
+            { label: 'Stone/Wastage (g)', name: 'stoneWastage', type: 'number', placeholder: '0.00', step: '0.01' },
             { label: 'Purity Level', name: 'purity', type: 'select', options: ['22K', '24K', '18K'] },
-            { label: 'Principal Sum (₹)', name: 'amount', type: 'number', placeholder: 'Loan amount' },
+            { label: 'Required Loan Amount (₹)', name: 'amount', type: 'number', placeholder: 'Loan amount' },
             { label: 'Interest Rate %', name: 'interest', type: 'number', placeholder: '2.0', step: '0.1' },
             { label: 'Pledge Date', name: 'date', type: 'date', span: true },
           ].map(field => (
@@ -896,11 +1009,13 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt,
 
       <div className="space-y-3">
         {/* Table Header (Desktop) */}
-        <div className="hidden lg:grid grid-cols-6 gap-4 px-8 py-3 bg-slate-900/50 rounded-xl border border-border-subtle text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+        <div className="hidden lg:grid grid-cols-8 gap-4 px-8 py-3 bg-slate-900/50 rounded-xl border border-border-subtle text-[10px] font-bold text-slate-500 uppercase tracking-widest">
            <div>Identity</div>
            <div>Collateral</div>
            <div>Terms</div>
            <div>Principal</div>
+           <div>Interest</div>
+           <div>Outstanding</div>
            <div>Status</div>
            <div className="text-right">Actions</div>
         </div>
@@ -921,12 +1036,12 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt,
                   </span>
                </div>
 
-               <div className="grid grid-cols-2 gap-4 pb-6 border-b border-border-subtle">
-                  <div>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Asset</p>
-                    <p className="font-semibold text-slate-200">{loan.weight}g <span className="text-slate-500 text-xs font-normal">{loan.purity}</span></p>
-                    <span className="text-[9px] text-slate-400">{loan.ornamentType || 'Item'}</span>
-                  </div>
+                <div className="grid grid-cols-2 gap-4 pb-6 border-b border-border-subtle">
+                   <div>
+                     <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Net weight</p>
+                     <p className="font-semibold text-slate-200">{(parseFloat(loan.weight) - parseFloat(loan.stoneWastage || 0)).toFixed(2)}g <span className="text-slate-500 text-xs font-normal">{loan.purity}</span></p>
+                     <span className="text-[9px] text-slate-400">{loan.ornamentType || 'Item'} (Gr: {loan.weight}g)</span>
+                   </div>
                   <div>
                     <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Interest</p>
                     <p className="font-semibold text-slate-200">{loan.interest}%</p>
@@ -934,18 +1049,24 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt,
                   </div>
                </div>
 
-               <div className="flex justify-between items-center">
+               <div className="flex justify-between items-center bg-slate-900/30 p-4 rounded-xl">
                   <div>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">Principal</p>
-                    <p className="text-xl font-bold text-white">₹{(loan.amount || 0).toLocaleString()}</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Principal</p>
+                    <p className="text-lg font-bold text-white">₹{getLoanState(loan).currentPrincipal.toLocaleString()}</p>
                   </div>
-                  <div className="flex gap-2">
-                    {loan.status === 'Active' ? (
-                      <button onClick={() => onRelease(loan.id)} className="bg-primary text-bg-main text-[10px] font-bold uppercase tracking-widest px-6 py-2.5 rounded-xl">Release</button>
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Outstanding</p>
+                    <p className="text-lg font-bold text-emerald-400">₹{getLoanState(loan).outstanding.toLocaleString()}</p>
+                  </div>
+               </div>
+               
+               <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest px-1">
+                  <span className="text-slate-500">Interest Accrued: <span className="text-orange-400">₹{getLoanState(loan).interestDue.toLocaleString()}</span></span>
+                  {loan.status === 'Active' ? (
+                       <button onClick={() => onRelease(loan.id)} className="bg-primary text-bg-main px-6 py-2.5 rounded-xl shadow-lg shadow-primary/10">Release</button>
                     ) : (
-                      <span className="text-[10px] text-slate-600 font-bold uppercase italic">Settled</span>
+                       <span className="text-slate-600 italic">Settled</span>
                     )}
-                  </div>
                </div>
                
                {/* Quick Receipts - Mobile */}
@@ -968,21 +1089,23 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt,
             </div>
 
             {/* Desktop View */}
-            <div className="hidden lg:grid grid-cols-6 gap-4 px-8 py-5 items-center">
+            <div className="hidden lg:grid grid-cols-8 gap-4 px-8 py-5 items-center">
                <div>
                   <p className="text-primary text-[10px] font-bold tracking-widest mb-0.5">{loan.id}</p>
                   <p className="text-white font-bold">{loan.name}</p>
                   <p className="text-slate-500 text-[10px]">{loan.phone}</p>
                </div>
-               <div className="space-y-1">
-                  <p className="text-slate-200 font-semibold">{loan.weight}g <span className="text-slate-500 text-xs font-normal">{loan.purity}</span></p>
-                  <span className="text-[10px] text-slate-500">{loan.ornamentType}</span>
-               </div>
+                <div className="space-y-1">
+                   <p className="text-slate-200 font-semibold">{(parseFloat(loan.weight) - parseFloat(loan.stoneWastage || 0)).toFixed(2)}g <span className="text-slate-500 text-xs font-normal">{loan.purity}</span></p>
+                   <span className="text-[10px] text-slate-500">{loan.ornamentType} (Gr: {loan.weight}g)</span>
+                </div>
                <div>
                   <p className="text-slate-200 font-semibold">{loan.interest}%</p>
                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Interest</p>
                </div>
-               <div className="text-white font-bold text-lg">₹{(loan.amount || 0).toLocaleString()}</div>
+               <div className="text-white font-bold">₹{getLoanState(loan).currentPrincipal.toLocaleString()}</div>
+               <div className="text-orange-400 font-bold">₹{getLoanState(loan).interestDue.toLocaleString()}</div>
+               <div className="text-emerald-400 font-bold text-lg">₹{getLoanState(loan).outstanding.toLocaleString()}</div>
                <div>
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest ${loan.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10' : 'bg-slate-800 text-slate-500'}`}>
                     <span className={`w-1 h-1 rounded-full ${loan.status === 'Active' ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
@@ -1109,6 +1232,73 @@ function CustomerRecords({ customers, onViewLoans }) {
            </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function SettingsMenu({ ratePerGram, setRatePerGram }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRate, setNewRate] = useState(ratePerGram);
+
+  const handleUpdateRate = async (e) => {
+    e.preventDefault();
+    try {
+       const res = await axios.post(`${API_BASE}/settings`, { ratePerGram: newRate });
+       if (res.data.success) {
+          alert('Rate updated successfully!');
+          setRatePerGram(res.data.ratePerGram);
+       }
+    } catch(err) {
+       alert(err.response?.data?.message || 'Error updating rate');
+    }
+  }
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    try {
+       const res = await axios.post(`${API_BASE}/settings`, { currentPassword, newPassword });
+       if (res.data.success) {
+          alert('Password updated successfully!');
+          setCurrentPassword('');
+          setNewPassword('');
+       }
+    } catch(err) {
+       alert(err.response?.data?.message || 'Error updating password');
+    }
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-700">
+      
+      {/* Rate Per Gram Section */}
+      <div className="bg-bg-surface border border-border-subtle p-8 rounded-[2rem] shadow-xl">
+        <h2 className="text-2xl font-bold text-white mb-6">Daily Gold Rate</h2>
+        <form onSubmit={handleUpdateRate} className="space-y-4">
+           <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Daily Rate per Gram (₹)</label>
+              <input required type="number" value={newRate} onChange={e=>setNewRate(Number(e.target.value))} className="w-full max-w-sm bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-3 outline-none focus:ring-2 focus:ring-primary/20 mt-1 block" />
+           </div>
+           <button type="submit" className="bg-primary text-bg-main font-bold py-3 px-8 rounded-xl hover:brightness-110 transition-all uppercase tracking-widest text-xs shadow-lg shadow-primary/10">Update Rate</button>
+        </form>
+      </div>
+
+      {/* Password Section */}
+      <div className="bg-bg-surface border border-border-subtle p-8 rounded-[2rem] shadow-xl">
+        <h2 className="text-2xl font-bold text-white mb-6">Change Security Password</h2>
+        <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-sm">
+           <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Current Password</label>
+              <input required type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} className="w-full bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-3 outline-none focus:ring-2 focus:ring-primary/20 mt-1" />
+           </div>
+           <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">New Password</label>
+              <input required type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} className="w-full bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-3 outline-none focus:ring-2 focus:ring-primary/20 mt-1" />
+           </div>
+           <button type="submit" className="bg-primary text-bg-main font-bold py-3 px-8 rounded-xl hover:brightness-110 transition-all uppercase tracking-widest text-xs shadow-lg shadow-primary/10">Change Password</button>
+        </form>
+      </div>
+
     </div>
   )
 }
