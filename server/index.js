@@ -9,7 +9,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/gold-shop';
@@ -24,6 +25,7 @@ const loanSchema = new mongoose.Schema({
     phone: { type: String, required: true },
     weight: Number,
     purity: String,
+    ornamentType: { type: String, default: 'Necklace' },
     amount: Number,
     interest: Number,
     date: { type: Date, default: Date.now },
@@ -31,7 +33,15 @@ const loanSchema = new mongoose.Schema({
     status: { type: String, default: 'Active' },
     releasedDate: Date,
     finalInterest: { type: Number, default: 0 },
-    totalPaid: { type: Number, default: 0 }
+    totalPaid: { type: Number, default: 0 },
+    goldPhoto: { type: String, default: null },
+    customerPhoto: { type: String, default: null },
+    payments: [{
+        paymentId: String,
+        date: { type: Date, default: Date.now },
+        amount: Number,
+        description: { type: String, default: 'Interest Payment' }
+    }]
 });
 
 const Loan = mongoose.model('Loan', loanSchema);
@@ -65,9 +75,9 @@ app.get('/api/loans', async (req, res) => {
 
 app.post('/api/loans', async (req, res) => {
     try {
-        const { name, phone, weight, purity, amount, interest, date } = req.body;
+        const { name, phone, weight, purity, ornamentType, amount, interest, date, goldPhoto, customerPhoto } = req.body;
         
-        // Auto-gen ID logic (can be improved with a counter collection, but for now simple)
+        // Auto-gen ID logic
         const lastLoan = await Loan.findOne().sort({ date: -1 });
         const lastIdNum = lastLoan && lastLoan.id ? parseInt(lastLoan.id.split('-')[1]) : 1000;
         const nextId = `L-${lastIdNum + 1}`;
@@ -78,9 +88,11 @@ app.post('/api/loans', async (req, res) => {
 
         const newLoan = new Loan({
             id: nextId,
-            name, phone, weight, purity, amount, interest,
+            name, phone, weight, purity, ornamentType: ornamentType || 'Necklace', amount, interest,
             date: loanDate,
-            dueDate: dueDate
+            dueDate: dueDate,
+            goldPhoto: goldPhoto || null,
+            customerPhoto: customerPhoto || null
         });
 
         const savedLoan = await newLoan.save();
@@ -97,17 +109,43 @@ app.put('/api/loans/:id/release', async (req, res) => {
         if (loan.status === 'Closed') return res.status(400).json({ message: 'Loan already closed' });
 
         const releasedDate = new Date();
-        const interestAmount = calculateInterest(loan.amount, loan.interest, loan.date, releasedDate);
+        const accruedInterest = calculateInterest(loan.amount, loan.interest, loan.date, releasedDate);
         
+        // Account for partial payments already made
+        const totalPaidSoFar = (loan.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+        const netInterestToPay = Math.max(0, accruedInterest - totalPaidSoFar);
+
         loan.status = 'Closed';
         loan.releasedDate = releasedDate;
-        loan.finalInterest = interestAmount;
-        loan.totalPaid = loan.amount + interestAmount;
+        loan.finalInterest = accruedInterest; // Total interest for the whole period
+        loan.totalPaid = loan.amount + netInterestToPay + totalPaidSoFar; // Principal + Actual Interest Paid
 
         const updatedLoan = await loan.save();
         res.json(updatedLoan);
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+app.post('/api/loans/:id/payments', async (req, res) => {
+    try {
+        const { amount, description } = req.body;
+        const loan = await Loan.findOne({ id: req.params.id });
+        if (!loan) return res.status(404).json({ message: 'Loan not found' });
+
+        const paymentId = `PAY-${Date.now().toString().slice(-6)}`;
+        const newPayment = {
+            paymentId,
+            amount: parseFloat(amount),
+            description: description || 'Interest Payment',
+            date: new Date()
+        };
+
+        loan.payments.push(newPayment);
+        const savedLoan = await loan.save();
+        res.status(201).json({ loan: savedLoan, payment: newPayment });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
     }
 });
 
@@ -121,6 +159,15 @@ app.get('/api/stats', async (req, res) => {
         const goldInStore = activeLoans.reduce((sum, l) => sum + (l.weight || 0), 0);
         const goldReleased = closedLoans.reduce((sum, l) => sum + (l.weight || 0), 0);
         const totalActiveLoanAmount = activeLoans.reduce((sum, l) => sum + (l.amount || 0), 0);
+        
+        // New: Track actual money collected
+        let totalInterestCollected = 0;
+        loans.forEach(l => {
+            if (l.payments) {
+                l.payments.forEach(p => totalInterestCollected += (p.amount || 0));
+            }
+        });
+        const totalRevenue = closedLoans.reduce((sum, l) => sum + (l.finalInterest || 0), 0) + totalInterestCollected;
 
         res.json({
             totalLoans: loans.length,
@@ -129,7 +176,9 @@ app.get('/api/stats', async (req, res) => {
             totalGoldReceived: totalGoldReceived.toFixed(2),
             goldInStore: goldInStore.toFixed(2),
             goldReleased: goldReleased.toFixed(2),
-            totalActiveLoanAmount: totalActiveLoanAmount.toFixed(2)
+            totalActiveLoanAmount: totalActiveLoanAmount.toFixed(2),
+            totalInterestCollected: totalInterestCollected.toFixed(2),
+            totalRevenue: totalRevenue.toFixed(2)
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -137,7 +186,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // Fallback to React app
-app.get('*', (req, res) => {
+app.get('/*splat', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 

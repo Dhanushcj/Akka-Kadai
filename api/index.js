@@ -7,19 +7,23 @@ require('dotenv').config();
 const app = express();
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 // MongoDB Connection with robust error handling for Serverless
-const MONGODB_URI = process.env.MONGODB_URI;
-
-// We connect outside the handler for connection pooling in Vercel
-if (MONGODB_URI) {
-    mongoose.connect(MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000 
-    })
-      .then(() => console.log('Connected to MongoDB Atlas'))
-      .catch(err => console.error('MongoDB connection error:', err));
-}
+// Helper: Serverless robust connection
+const connectDB = async () => {
+    if (mongoose.connection.readyState >= 1) return;
+    try {
+        await mongoose.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000
+        });
+        console.log('Connected to MongoDB Atlas (Serverless)');
+    } catch (err) {
+        console.error('MongoDB connection error:', err);
+        throw new Error('Database connection failed');
+    }
+};
 
 // Loan Schema
 const loanSchema = new mongoose.Schema({
@@ -28,6 +32,7 @@ const loanSchema = new mongoose.Schema({
     phone: { type: String, required: true },
     weight: Number,
     purity: String,
+    ornamentType: { type: String, default: 'Necklace' },
     amount: Number,
     interest: Number,
     date: { type: Date, default: Date.now },
@@ -35,7 +40,15 @@ const loanSchema = new mongoose.Schema({
     status: { type: String, default: 'Active' },
     releasedDate: Date,
     finalInterest: { type: Number, default: 0 },
-    totalPaid: { type: Number, default: 0 }
+    totalPaid: { type: Number, default: 0 },
+    goldPhoto: { type: String, default: null },
+    customerPhoto: { type: String, default: null },
+    payments: [{
+        paymentId: String,
+        date: { type: Date, default: Date.now },
+        amount: Number,
+        description: { type: String, default: 'Interest Payment' }
+    }]
 });
 
 const Loan = mongoose.model('Loan', loanSchema);
@@ -68,7 +81,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/loans', async (req, res) => {
     try {
-        if (!mongoose.connection.readyState) throw new Error('Database not connected');
+        await connectDB();
         const loans = await Loan.find().sort({ date: -1 });
         res.json(loans);
     } catch (err) {
@@ -78,11 +91,16 @@ app.get('/api/loans', async (req, res) => {
 
 app.post('/api/loans', async (req, res) => {
     try {
-        if (!mongoose.connection.readyState) throw new Error('Database not connected');
-        const { name, phone, weight, purity, amount, interest, date } = req.body;
+        await connectDB();
+        const { name, phone, weight, purity, ornamentType, amount, interest, date, goldPhoto, customerPhoto } = req.body;
         
-        const lastLoan = await Loan.findOne().sort({ id: -1 });
-        const lastIdNum = lastLoan && lastLoan.id ? parseInt(lastLoan.id.split('-')[1]) : 1000;
+        const lastLoan = await Loan.findOne().sort({ date: -1 });
+        let lastIdNum = 1000;
+        if (lastLoan && lastLoan.id && lastLoan.id.includes('-')) {
+            const parts = lastLoan.id.split('-');
+            const num = parseInt(parts[1]);
+            if (!isNaN(num)) lastIdNum = num;
+        }
         const nextId = `L-${lastIdNum + 1}`;
 
         const loanDate = date ? new Date(date) : new Date();
@@ -91,9 +109,11 @@ app.post('/api/loans', async (req, res) => {
 
         const newLoan = new Loan({
             id: nextId,
-            name, phone, weight, purity, amount, interest,
+            name, phone, weight, purity, ornamentType: ornamentType || 'Necklace', amount, interest,
             date: loanDate,
-            dueDate: dueDate
+            dueDate: dueDate,
+            goldPhoto: goldPhoto || null,
+            customerPhoto: customerPhoto || null
         });
 
         const savedLoan = await newLoan.save();
@@ -105,18 +125,22 @@ app.post('/api/loans', async (req, res) => {
 
 app.put('/api/loans/:id/release', async (req, res) => {
     try {
-        if (!mongoose.connection.readyState) throw new Error('Database not connected');
+        await connectDB();
         const loan = await Loan.findOne({ id: req.params.id });
         if (!loan) return res.status(404).json({ message: 'Loan not found' });
         if (loan.status === 'Closed') return res.status(400).json({ message: 'Loan already closed' });
 
         const releasedDate = new Date();
-        const interestAmount = calculateInterest(loan.amount, loan.interest, loan.date, releasedDate);
+        const accruedInterest = calculateInterest(loan.amount, loan.interest, loan.date, releasedDate);
         
+        // Account for partial payments already made
+        const totalPaidSoFar = (loan.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+        const netInterestToPay = Math.max(0, accruedInterest - totalPaidSoFar);
+
         loan.status = 'Closed';
         loan.releasedDate = releasedDate;
-        loan.finalInterest = interestAmount;
-        loan.totalPaid = loan.amount + interestAmount;
+        loan.finalInterest = accruedInterest; // Total interest for the whole period
+        loan.totalPaid = loan.amount + netInterestToPay + totalPaidSoFar; // Principal + Actual Interest Paid
 
         const updatedLoan = await loan.save();
         res.json(updatedLoan);
@@ -125,9 +149,32 @@ app.put('/api/loans/:id/release', async (req, res) => {
     }
 });
 
+app.post('/api/loans/:id/payments', async (req, res) => {
+    try {
+        await connectDB();
+        const { amount, description } = req.body;
+        const loan = await Loan.findOne({ id: req.params.id });
+        if (!loan) return res.status(404).json({ message: 'Loan not found' });
+
+        const paymentId = `PAY-${Date.now().toString().slice(-6)}`;
+        const newPayment = {
+            paymentId,
+            amount: parseFloat(amount),
+            description: description || 'Interest Payment',
+            date: new Date()
+        };
+
+        loan.payments.push(newPayment);
+        const savedLoan = await loan.save();
+        res.status(201).json({ loan: savedLoan, payment: newPayment });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 app.get('/api/stats', async (req, res) => {
     try {
-        if (!mongoose.connection.readyState) throw new Error('Database not connected');
+        await connectDB();
         const loans = await Loan.find();
         const activeLoans = loans.filter(l => l.status === 'Active');
         const closedLoans = loans.filter(l => l.status === 'Closed');
@@ -137,6 +184,15 @@ app.get('/api/stats', async (req, res) => {
         const goldReleased = closedLoans.reduce((sum, l) => sum + (l.weight || 0), 0);
         const totalActiveLoanAmount = activeLoans.reduce((sum, l) => sum + (l.amount || 0), 0);
 
+        // Track actual money collected
+        let totalInterestCollected = 0;
+        loans.forEach(l => {
+            if (l.payments) {
+                l.payments.forEach(p => totalInterestCollected += (p.amount || 0));
+            }
+        });
+        const totalRevenue = closedLoans.reduce((sum, l) => sum + (l.finalInterest || 0), 0) + totalInterestCollected;
+
         res.json({
             totalLoans: loans.length,
             activeLoansCount: activeLoans.length,
@@ -144,7 +200,9 @@ app.get('/api/stats', async (req, res) => {
             totalGoldReceived: totalGoldReceived.toFixed(2),
             goldInStore: goldInStore.toFixed(2),
             goldReleased: goldReleased.toFixed(2),
-            totalActiveLoanAmount: totalActiveLoanAmount.toFixed(2)
+            totalActiveLoanAmount: totalActiveLoanAmount.toFixed(2),
+            totalInterestCollected: totalInterestCollected.toFixed(2),
+            totalRevenue: totalRevenue.toFixed(2)
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
