@@ -107,15 +107,21 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#eee}
 .sig-row{display:flex;justify-content:space-between;margin-top:28px;margin-bottom:8px}
 .sig-blk{text-align:center;width:42%}
 .sig-ln{border-top:1px solid #333;margin-top:40px;padding-top:5px;font-size:10px;font-weight:700}
-.footer2{background:#1a1a1a;color:#fff;text-align:center;padding:7px;font-size:9px;letter-spacing:.5px}
-.pbtn{position:fixed;bottom:18px;right:18px;background:#D4AF37;color:#000;border:none;padding:12px 24px;border-radius:8px;font-weight:900;font-size:13px;cursor:pointer;text-transform:uppercase;letter-spacing:1px;box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:999}
-.cut-line { display: none; }
-@media print{
-  .pbtn{display:none} 
-  .page{margin:0;border:2px solid #333;padding:10px;page-break-after:always;}
-  body{background:#fff}
-  .cut-line{display:block;border-top:2px dashed #ccc;margin:20px 0;page-break-after:always;}
-}
+  .footer2{background:#1a1a1a;color:#fff;text-align:center;padding:7px;font-size:9px;letter-spacing:.5px}
+  .pbtn{position:fixed;bottom:18px;right:18px;background:#D4AF37;color:#000;border:none;padding:12px 24px;border-radius:8px;font-weight:900;font-size:13px;cursor:pointer;text-transform:uppercase;letter-spacing:1px;box-shadow:0 4px 166px rgba(0,0,0,.25);z-index:999}
+  .cut-line { display: none; }
+  .terms-page { display: block; border: 2px solid #333; padding: 25px; margin-top: 20px; background: #fff; position: relative; }
+  .terms-hdr { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+  .terms-list { font-size: 11px; line-height: 1.8; color: #111; }
+  .terms-item { margin-bottom: 12px; text-align: justify; }
+  .terms-item b { color: #000; display: block; margin-bottom: 2px; }
+  @media print{
+    .pbtn{display:none} 
+    .page{margin:0;border:2px solid #333;padding:15px;page-break-after:always;}
+    .terms-page { margin-top: 0; border: 2px solid #333; padding: 25px; min-height: 100vh; page-break-before: always; page-break-after: always; }
+    body{background:#fff}
+    .cut-line{display:block;border-top:2px dashed #999;margin:30px 0;page-break-before:always;}
+  }
 </style></head><body>
 ${['CUSTOMER', 'OFFICE'].map((copyType, index) => `
 <div class="page" ${index === 1 ? 'style="border-style: dashed;"' : ''}>
@@ -193,20 +199,35 @@ ${['CUSTOMER', 'OFFICE'].map((copyType, index) => `
     <td>${(parseFloat(loan.weight) - parseFloat(loan.stoneWastage || 0)).toFixed(2)}</td>
   </tr></tbody>
 </table>
-<div class="terms">
-  <b>Terms &amp; Conditions:</b>&nbsp;
-  1. The pledged gold ornament(s) will be returned only upon full repayment of principal plus accrued interest.&nbsp;
-  2. Interest is calculated at ${loan.interest}% per month on the outstanding principal.&nbsp;
-  3. Failure to repay before due date may result in forfeiture of the pledged item or legal action.&nbsp;
-  4. This receipt is the only valid proof of pledge &mdash; keep it safely.&nbsp;
-  5. Any change in interest rate will be effective from the date of notification.&nbsp;
-  6. All disputes are subject to local jurisdiction only.
-</div>
 <div class="sig-row">
   <div class="sig-blk"><div class="sig-ln">Signature of the Borrower</div><div style="font-size:10px;color:#555;margin-top:2px">${loan.name}</div></div>
   <div class="sig-blk"><div class="sig-ln">Signature of Branch Manager</div><div style="font-size:10px;color:#555;margin-top:2px">Sri Vishnu Madha Nagai Adagu Kadai</div></div>
 </div>
 <div class="footer2">Sri Vishnu Madha Nagai Adagu Kadai &bull; Vaiyampatti Road, Irumathur &bull; Contact: 7339638249 &bull; &copy; ${new Date().getFullYear()}</div>
+</div>
+<div class="terms-page">
+  <div class="terms-hdr">
+    <div style="font-size: 18px; font-weight: 900; color: #D4AF37;">Sri Vishnu Madha Nagai Adagu Kadai</div>
+    <div style="font-size: 12px; font-weight: 700; margin-top: 5px;">விதிமுறைகள் மற்றும் நிபந்தனைகள் (Terms & Conditions)</div>
+    <div style="font-size: 10px; margin-top: 3px;">Loan No: ${loan.id} &bull; ${copyType} COPY</div>
+  </div>
+  <div class="terms-list">
+    <div class="terms-item"><b>1. காலக்கெடு (Loan Period):</b> இந்தக் கடனின் கால அளவு 12 மாதங்கள் மட்டுமே. காலக்கெடு முடிவதற்குள் அசலையும் வட்டியையும் செலுத்தி நகையை மீட்க வேண்டும்.</div>
+    <div class="terms-item"><b>2. வட்டி விகிதம் (Interest):</b> வட்டி மாதத்திற்கு <b>${loan.interest}%</b> வீதம் கணக்கிடப்படும். ஒரு மாதத்தின் இடையில் நகையை மீட்டாலும், அந்த முழு மாதத்திற்கான வட்டி வசூலிக்கப்படும்.</div>
+    <div class="terms-item"><b>3. அடகுச் சீட்டின் முக்கியத்துவம்:</b> நகையை மீட்க வரும்போது இந்த அடகுச் சீட்டை கண்டிப்பாகக் கொண்டு வர வேண்டும். சீட்டு தொலைந்து போனால், உரிய அடையாளச் சான்று மற்றும் அபராதக் கட்டணம் செலுத்தி மாற்றுச் சீட்டு பெற வேண்டும்.</div>
+    <div class="terms-item"><b>4. நகையின் எடை மற்றும் தரம்:</b> நகையின் நிகர எடை (Net Weight) மற்றும் தரம் வாடிக்கையாளர் முன்னிலையிலேயே சரிபார்க்கப்பட்டது. இதில் பின்னாளில் ஆட்சேபனை தெரிவிக்க இயலாது.</div>
+    <div class="terms-item"><b>5. பகுதிப் பணம் (Part Payment):</b> வாடிக்கையாளர் விரும்பினால் அசல் தொகையில் ஒரு பகுதியை முன்கூட்டியே செலுத்தலாம். அதற்கேற்ப வட்டி குறைக்கப்படும்.</div>
+    <div class="terms-item"><b>6. நகைப் பாதுகாப்பு:</b> அடகு வைக்கப்பட்ட நகைகள் பாதுகாப்பான பெட்டகத்தில் வைக்கப்படும். இயற்கை பேரிடர் அல்லது தவிர்க்க முடியாத காரணங்களால் ஏற்படும் இழப்புகளுக்கு நிறுவன விதிமுறைப்படி இழப்பீடு வழங்கப்படும்.</div>
+    <div class="terms-item"><b>7. ஏல அறிவிப்பு (Auction):</b> 12 மாதங்களுக்கு மேல் வட்டியோ அல்லது அசலோ செலுத்தப்படாவிட்டால், உரிய முன்னறிவிப்பு இன்றி நகையை பொது ஏலத்தில் விட கடை உரிமையாளருக்கு முழு அதிகாரம் உண்டு.</div>
+    <div class="terms-item"><b>8. மேலதிகக் கட்டணங்கள்:</b> குறித்த காலத்திற்குள் வட்டி செலுத்தத் தவறினால், அபராத வட்டி (Penalty Interest) வசூலிக்கப்படும்.</div>
+    <div class="terms-item"><b>9. நகை மீட்பு (Redemption):</b> அசலும் வட்டியும் முழுமையாகச் செலுத்திய பின்னரே நகை ஒப்படைக்கப்படும். நகையை மீட்கும்போது அதன் எடையைச் சரிபார்த்துப் பெற்றுக்கொள்வது வாடிக்கையாளரின் பொறுப்பு.</div>
+    <div class="terms-item"><b>10. முகவரி மாற்றம்:</b> வாடிக்கையாளர் தனது முகவரி அல்லது தொலைபேசி எண்ணை மாற்றினால், அதை உடனடியாகக் கடைக்குத் தெரிவிக்க வேண்டும்.</div>
+  </div>
+  <div class="sig-row" style="margin-top: 60px;">
+    <div class="sig-blk"><div class="sig-ln">Customer Signature</div></div>
+    <div class="sig-blk"><div class="sig-ln">Manager Signature</div></div>
+  </div>
+  <div class="footer2" style="margin-top: 30px;">This serves as a legal binding agreement between the shop and the customer.</div>
 </div>
 ${index === 0 ? '<div class="cut-line"></div>' : ''}
 `).join('')}
@@ -349,12 +370,10 @@ ${type==='settlement'?`
   win.document.write(html)
   win.document.close()
 }
-
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
-  const [ratePerGram, setRatePerGram] = useState(7000)
 
   const [activeTab, setActiveTab] = useState('dashboard')
   const [loans, setLoans] = useState([])
@@ -366,6 +385,7 @@ function App() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [currentLoanForPayment, setCurrentLoanForPayment] = useState(null)
   const [paymentFormData, setPaymentFormData] = useState({ amount: '', description: 'Interest Payment' })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Form State
   const [formData, setFormData] = useState({
@@ -412,13 +432,8 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const netWeight = (parseFloat(formData.weight) || 0) - (parseFloat(formData.stoneWastage) || 0);
-    const eligibleAmount = Math.floor(netWeight * ratePerGram);
-    if (parseFloat(formData.amount) > eligibleAmount) {
-       alert(`Required Loan Amount cannot exceed Eligible Amount (₹${eligibleAmount.toLocaleString()})`);
-       return;
-    }
-
+    if (isSubmitting) return
+    setIsSubmitting(true)
     try {
       await axios.post(`${API_BASE}/loans`, {
         ...formData,
@@ -443,6 +458,8 @@ function App() {
       setActiveTab('loans')
     } catch (err) {
       alert('Error creating loan: ' + (err.response?.data?.error || err.response?.data?.message || err.message))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -525,7 +542,6 @@ function App() {
             try {
               const res = await axios.post(`${API_BASE}/login`, { password: loginPassword });
               if (res.data.success) {
-                setRatePerGram(res.data.ratePerGram || 7000);
                 setIsLoggedIn(true);
               }
             } catch(err) {
@@ -609,11 +625,11 @@ function App() {
             formData={formData}
             onChange={handleInputChange}
             onSubmit={handleSubmit}
+            isSubmitting={isSubmitting}
             goldPhoto={goldPhoto}
             setGoldPhoto={setGoldPhoto}
             customerPhoto={customerPhoto}
             setCustomerPhoto={setCustomerPhoto}
-            ratePerGram={ratePerGram}
           />
         )}
         {activeTab === 'loans' && (
@@ -641,7 +657,7 @@ function App() {
           />
         )}
         {activeTab === 'settings' && (
-          <SettingsMenu ratePerGram={ratePerGram} setRatePerGram={setRatePerGram} />
+          <SettingsMenu />
         )}
       </main>
 
@@ -874,22 +890,14 @@ function PhotoCapture({ label, icon, photo, setPhoto, captureMode }) {
   )
 }
 
-function NewLoanForm({ formData, onChange, onSubmit, goldPhoto, setGoldPhoto, customerPhoto, setCustomerPhoto, ratePerGram }) {
-  const netWeight = (parseFloat(formData.weight) || 0) - (parseFloat(formData.stoneWastage) || 0);
-  const eligibleAmount = Math.floor(netWeight * ratePerGram);
+function NewLoanForm({ formData, onChange, onSubmit, isSubmitting, goldPhoto, setGoldPhoto, customerPhoto, setCustomerPhoto }) {
+
 
   return (
     <div className="max-w-4xl mx-auto bg-bg-surface border border-border-subtle p-8 md:p-12 rounded-[2rem] shadow-xl animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div>
-          <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">New Pledge Entry</h2>
-          <p className="text-slate-500 text-sm font-medium">Initialize loan terms and document collateral assets</p>
-        </div>
-        <div className="bg-slate-900 border border-emerald-500/20 p-5 rounded-2xl md:min-w-[240px]">
-          <p className="text-[10px] uppercase font-bold tracking-widest text-emerald-500 mb-1">Eligible Loan Amount</p>
-          <p className="text-3xl font-black text-emerald-400">₹{eligibleAmount.toLocaleString()}</p>
-          <p className="text-slate-500 text-[9px] uppercase tracking-widest mt-2">{netWeight.toFixed(2)}g × ₹{ratePerGram}/g</p>
-        </div>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">New Pledge Entry</h2>
+        <p className="text-slate-500 text-sm font-medium">Initialize loan terms and document collateral assets</p>
       </div>
       
       <form onSubmit={onSubmit} className="space-y-10">
@@ -971,9 +979,10 @@ function NewLoanForm({ formData, onChange, onSubmit, goldPhoto, setGoldPhoto, cu
 
         <button
           type="submit"
-          className="w-full bg-primary text-bg-main font-bold py-5 rounded-2xl hover:brightness-110 transition-all active:scale-[0.98] shadow-xl shadow-primary/10 uppercase tracking-widest text-sm mt-4"
+          disabled={isSubmitting}
+          className={`w-full font-bold py-5 rounded-2xl transition-all active:scale-[0.98] shadow-xl uppercase tracking-widest text-sm mt-4 ${isSubmitting ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-primary text-bg-main hover:brightness-110 shadow-primary/10'}`}
         >
-          Finalize & Issue Loan
+          {isSubmitting ? 'Processing Entry...' : 'Finalize & Issue Loan'}
         </button>
       </form>
     </div>
@@ -1236,23 +1245,11 @@ function CustomerRecords({ customers, onViewLoans }) {
   )
 }
 
-function SettingsMenu({ ratePerGram, setRatePerGram }) {
+function SettingsMenu() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newRate, setNewRate] = useState(ratePerGram);
 
-  const handleUpdateRate = async (e) => {
-    e.preventDefault();
-    try {
-       const res = await axios.post(`${API_BASE}/settings`, { ratePerGram: newRate });
-       if (res.data.success) {
-          alert('Rate updated successfully!');
-          setRatePerGram(res.data.ratePerGram);
-       }
-    } catch(err) {
-       alert(err.response?.data?.message || 'Error updating rate');
-    }
-  }
+
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
@@ -1271,17 +1268,7 @@ function SettingsMenu({ ratePerGram, setRatePerGram }) {
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-700">
       
-      {/* Rate Per Gram Section */}
-      <div className="bg-bg-surface border border-border-subtle p-8 rounded-[2rem] shadow-xl">
-        <h2 className="text-2xl font-bold text-white mb-6">Daily Gold Rate</h2>
-        <form onSubmit={handleUpdateRate} className="space-y-4">
-           <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Daily Rate per Gram (₹)</label>
-              <input required type="number" value={newRate} onChange={e=>setNewRate(Number(e.target.value))} className="w-full max-w-sm bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-3 outline-none focus:ring-2 focus:ring-primary/20 mt-1 block" />
-           </div>
-           <button type="submit" className="bg-primary text-bg-main font-bold py-3 px-8 rounded-xl hover:brightness-110 transition-all uppercase tracking-widest text-xs shadow-lg shadow-primary/10">Update Rate</button>
-        </form>
-      </div>
+
 
       {/* Password Section */}
       <div className="bg-bg-surface border border-border-subtle p-8 rounded-[2rem] shadow-xl">

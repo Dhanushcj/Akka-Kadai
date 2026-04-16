@@ -27,7 +27,7 @@ const connectDB = async () => {
 
 // Loan Schema
 const loanSchema = new mongoose.Schema({
-    id: String,
+    id: { type: String, unique: true },
     name: { type: String, required: true },
     phone: { type: String, required: true },
     weight: Number,
@@ -57,8 +57,7 @@ const Loan = mongoose.model('Loan', loanSchema);
 // Settings Schema
 const settingsSchema = new mongoose.Schema({
     id: { type: String, default: 'global' },
-    password: { type: String, default: 'admin123' },
-    ratePerGram: { type: Number, default: 7000 }
+    password: { type: String, default: 'admin123' }
 });
 const Settings = mongoose.model('Settings', settingsSchema);
 
@@ -123,7 +122,7 @@ app.post('/api/login', async (req, res) => {
         if (!settings) settings = await (new Settings({})).save();
         
         if (req.body.password === settings.password) {
-            res.json({ success: true, ratePerGram: settings.ratePerGram });
+            res.json({ success: true });
         } else {
             res.status(401).json({ success: false, message: 'Invalid password' });
         }
@@ -137,7 +136,7 @@ app.get('/api/settings', async (req, res) => {
         await connectDB();
         let settings = await Settings.findOne({ id: 'global' });
         if (!settings) settings = await (new Settings({})).save();
-        res.json({ ratePerGram: settings.ratePerGram });
+        res.json({ success: true }); // Returning success but no rate
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -146,7 +145,7 @@ app.get('/api/settings', async (req, res) => {
 app.post('/api/settings', async (req, res) => {
     try {
         await connectDB();
-        const { currentPassword, newPassword, ratePerGram } = req.body;
+        const { currentPassword, newPassword } = req.body;
         let settings = await Settings.findOne({ id: 'global' });
         if (!settings) settings = await (new Settings({})).save();
         
@@ -156,13 +155,9 @@ app.post('/api/settings', async (req, res) => {
             }
             settings.password = newPassword;
         }
-        
-        if (ratePerGram !== undefined) {
-            settings.ratePerGram = ratePerGram;
-        }
 
         await settings.save();
-        res.json({ success: true, ratePerGram: settings.ratePerGram });
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -193,12 +188,14 @@ app.post('/api/loans', async (req, res) => {
         await connectDB();
         const { name, phone, weight, stoneWastage, purity, ornamentType, amount, interest, date, goldPhoto, customerPhoto } = req.body;
         
-        const lastLoan = await Loan.findOne().sort({ date: -1 });
+        const loans = await Loan.find({ id: { $regex: /^L-/ } });
         let lastIdNum = 1000;
-        if (lastLoan && lastLoan.id && lastLoan.id.includes('-')) {
-            const parts = lastLoan.id.split('-');
-            const num = parseInt(parts[1]);
-            if (!isNaN(num)) lastIdNum = num;
+        if (loans.length > 0) {
+            loans.forEach(loan => {
+                const parts = loan.id.split('-');
+                const num = parseInt(parts[1]);
+                if (!isNaN(num) && num > lastIdNum) lastIdNum = num;
+            });
         }
         const nextId = `L-${lastIdNum + 1}`;
 
