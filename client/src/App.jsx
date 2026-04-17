@@ -555,8 +555,8 @@ function App() {
     return (
       <div className="min-h-screen bg-bg-main text-slate-100 flex items-center justify-center p-4">
         <div className="bg-bg-surface border border-border-subtle p-8 rounded-3xl w-full max-w-sm shadow-xl text-center">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/20">
-            <span className="text-bg-main font-black text-3xl">V</span>
+          <div className="w-24 h-24 bg-bg-surface border-2 border-primary/30 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-primary/10 overflow-hidden group hover:scale-105 transition-transform duration-500">
+            <img src="/icon-512.png" alt="Sri Vishnu Madha Logo" className="w-full h-full object-cover" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Admin Login</h2>
           <p className="text-slate-500 text-sm mb-6">Sri Vishnu Madha Nagai Adagu Kadai</p>
@@ -586,9 +586,9 @@ function App() {
     <div className="min-h-screen bg-bg-main text-slate-100 font-sans selection:bg-primary/30 selection:text-white pb-10">
       {/* Navbar */}
       <nav className="bg-bg-main/80 backdrop-blur-md border-b border-border-subtle sticky top-0 z-50 px-4 md:px-8 py-4 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/10">
-            <span className="text-bg-main font-bold text-lg">V</span>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-bg-surface border border-primary/20 rounded-xl flex items-center justify-center shadow-lg shadow-primary/10 overflow-hidden group hover:scale-105 transition-all">
+            <img src="/icon-192.png" alt="Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-xl font-bold text-white tracking-tight flex flex-col justify-center">
             <span className="leading-none">Sri Vishnu</span>
