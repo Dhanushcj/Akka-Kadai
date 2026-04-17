@@ -428,8 +428,10 @@ function App() {
   const [customerPhoto, setCustomerPhoto] = useState(null)
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (isLoggedIn) {
+      fetchData()
+    }
+  }, [isLoggedIn])
 
   const fetchData = async () => {
     setIsLoading(true)
