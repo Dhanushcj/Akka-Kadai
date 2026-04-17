@@ -7,8 +7,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/public/$1",
-      "check": true
+      "destination": "/public/$1"
     },
     {
       "source": "/(.*)",
