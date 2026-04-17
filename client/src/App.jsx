@@ -3,6 +3,29 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
+// ─── Axios Configuration & Security Interceptors ───────────────────────────
+axios.interceptors.request.use(config => {
+  const token = localStorage.getItem('svm_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, error => Promise.reject(error));
+
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      // Session expired or invalid
+      if (localStorage.getItem('svm_token')) {
+        localStorage.removeItem('svm_token');
+        window.location.reload(); // Force full app reset to login
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const calculateInterest = (amount, rate, startDate, endDate = new Date()) => {
   const start = new Date(startDate)
@@ -371,7 +394,7 @@ ${type==='settlement'?`
   win.document.close()
 }
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('svm_token'))
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
 
@@ -541,11 +564,13 @@ function App() {
             e.preventDefault();
             try {
               const res = await axios.post(`${API_BASE}/login`, { password: loginPassword });
-              if (res.data.success) {
+              if (res.data.success && res.data.token) {
+                localStorage.setItem('svm_token', res.data.token);
                 setIsLoggedIn(true);
               }
             } catch(err) {
-              alert(err.response?.data?.message || 'Invalid credentials');
+              const errMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+              alert('Login Failed: ' + errMsg);
             }
           }} className="space-y-4">
             <input type="text" placeholder="Username" value={loginUsername} onChange={e => setLoginUsername(e.target.value)} className="w-full bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-3 outline-none focus:ring-2 focus:ring-primary/20" />
@@ -582,6 +607,12 @@ function App() {
               {tab.label}
             </button>
           ))}
+          <button 
+            onClick={() => { localStorage.removeItem('svm_token'); window.location.reload(); }} 
+            className="px-5 py-2 rounded-lg text-sm font-semibold text-rose-400 hover:text-white hover:bg-rose-500/10 transition-all ml-2"
+          >
+            Sign Out
+          </button>
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -614,6 +645,12 @@ function App() {
                 {tab.label}
               </button>
             ))}
+            <button 
+              onClick={() => { localStorage.removeItem('svm_token'); window.location.reload(); }} 
+              className="w-full text-left px-5 py-4 rounded-xl text-base font-semibold text-rose-400 hover:bg-rose-500/10 transition-all border-t border-border-subtle mt-4"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </div>

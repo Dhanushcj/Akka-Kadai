@@ -10,7 +10,8 @@ yarn-error.log*
 dist/
 build/
 .vite/
-public/
+/public/
+!/client/public/
 
 # Database
 server/data.json

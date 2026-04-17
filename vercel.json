@@ -7,7 +7,12 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/public/$1"
+      "destination": "/public/$1",
+      "check": true
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/public/index.html"
     }
   ]
 }
