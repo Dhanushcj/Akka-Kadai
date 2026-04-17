@@ -16,7 +16,7 @@ app.use(helmet());
 // Brute-force protection for Login
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit each IP to 5 login requests per window
+    max: 100, // Increased for initial setup support
     message: { message: 'Too many login attempts, please try again after 15 minutes' }
 });
 
