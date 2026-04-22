@@ -243,6 +243,18 @@ app.post('/api/loans/:id/payments', async (req, res) => {
     }
 });
 
+app.delete('/api/loans/:id', async (req, res) => {
+    try {
+        const loan = await Loan.findOne({ id: req.params.id });
+        if (!loan) return res.status(404).json({ message: 'Loan not found' });
+
+        await Loan.deleteOne({ id: req.params.id });
+        res.json({ message: 'Loan deleted successfully', id: req.params.id });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 app.get('/api/stats', async (req, res) => {
     try {
         const loans = await Loan.find();

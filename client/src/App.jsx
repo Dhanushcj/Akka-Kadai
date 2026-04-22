@@ -514,6 +514,18 @@ function App() {
     }
   }
 
+  const handleDelete = async (loanId) => {
+    if (window.confirm(`Are you sure you want to delete loan ${loanId}? This action cannot be undone.`)) {
+      try {
+        await axios.delete(`${API_BASE}/loans/${loanId}`)
+        fetchData()
+        alert('Loan Deleted Successfully!')
+      } catch (err) {
+        alert('Error deleting loan')
+      }
+    }
+  }
+
   const getFilteredLoans = () => {
     const safeLoans = Array.isArray(loans) ? loans : []
     let filtered = [...safeLoans]
@@ -677,6 +689,7 @@ function App() {
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             onRelease={handleRelease}
+            onDelete={handleDelete}
             onPrintReceipt={printReceipt}
             selectedCustomer={selectedCustomer}
             onClearFilter={() => setSelectedCustomer(null)}
@@ -1028,7 +1041,7 @@ function NewLoanForm({ formData, onChange, onSubmit, isSubmitting, goldPhoto, se
   )
 }
 
-function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt, selectedCustomer, onClearFilter, isPaymentModalOpen, setIsPaymentModalOpen, currentLoanForPayment, setCurrentLoanForPayment, paymentFormData, setPaymentFormData, onPayment }) {
+function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onDelete, onPrintReceipt, selectedCustomer, onClearFilter, isPaymentModalOpen, setIsPaymentModalOpen, currentLoanForPayment, setCurrentLoanForPayment, paymentFormData, setPaymentFormData, onPayment }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
@@ -1118,7 +1131,7 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt,
                </div>
                
                {/* Quick Receipts - Mobile */}
-               <div className="grid grid-cols-3 gap-2">
+               <div className="grid grid-cols-4 gap-2">
                  <button onClick={() => onPrintReceipt(loan, 'loan')} className="flex flex-col items-center gap-1 p-3 bg-slate-900 rounded-xl hover:bg-slate-800 text-slate-400 transition-all border border-border-subtle">
                     <span className="text-xs">🧾</span>
                     <span className="text-[8px] font-bold uppercase">Loan</span>
@@ -1133,6 +1146,10 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt,
                       <span className="text-[8px] font-bold uppercase">Record</span>
                    </button>
                  )}
+                 <button onClick={() => onDelete(loan.id)} className="flex flex-col items-center gap-1 p-3 bg-red-900/20 rounded-xl hover:bg-red-900 text-red-500 hover:text-white transition-all border border-red-500/10">
+                    <span className="text-xs">🗑️</span>
+                    <span className="text-[8px] font-bold uppercase">Delete</span>
+                 </button>
                </div>
             </div>
 
@@ -1174,6 +1191,9 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onPrintReceipt,
                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     </button>
                   )}
+                  <button onClick={() => onDelete(loan.id)} title="Delete Loan" className="p-2 bg-red-500/10 text-red-400 border border-red-500/10 rounded-lg hover:bg-red-500 hover:text-white transition-all">
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
                </div>
             </div>
           </div>
