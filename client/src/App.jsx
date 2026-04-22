@@ -139,6 +139,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#eee}
   .terms-item { margin-bottom: 12px; text-align: justify; }
   .terms-item b { color: #000; display: block; margin-bottom: 2px; }
   @media print{
+    *{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     .pbtn{display:none} 
     .page{margin:0;border:2px solid #333;padding:15px;page-break-after:always;}
     .terms-page { margin-top: 0; border: 2px solid #333; padding: 25px; min-height: 100vh; page-break-before: always; page-break-after: always; }
@@ -291,7 +292,7 @@ ${index === 0 ? '<div class="cut-line"></div>' : ''}
 .settled-stamp{position:fixed;top:46%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);font-size:72px;font-weight:900;color:rgba(0,160,0,.07);pointer-events:none;letter-spacing:6px}
 .footer{text-align:center;margin-top:24px;padding-top:14px;border-top:1px solid #eee;font-size:10px;color:#bbb}
 .print-btn{position:fixed;bottom:20px;right:20px;background:#D4AF37;color:#000;border:none;padding:13px 26px;border-radius:8px;font-weight:900;font-size:13px;cursor:pointer;text-transform:uppercase;letter-spacing:1px;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:999}
-@media print{.print-btn{display:none}.page{margin:0;border:none;box-shadow:none;padding:28px}body{background:#fff}}
+@media print{ *{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .print-btn{display:none}.page{margin:0;border:none;box-shadow:none;padding:28px}body{background:#fff}}
 </style></head><body>
 ${type==='settlement'?'<div class="settled-stamp">SETTLED</div>':''}
 <div class="page">
