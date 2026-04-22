@@ -453,11 +453,17 @@ function App() {
   }
 
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    let val = e.target.value;
+    if (e.target.type === 'number' && parseFloat(val) < 0) return;
+    setFormData({ ...formData, [e.target.name]: val })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!goldPhoto || !customerPhoto) {
+      alert('Visual Documentation is mandatory. Please capture both Collateral and Client photos.');
+      return;
+    }
     if (isSubmitting) return
     setIsSubmitting(true)
     try {
@@ -977,6 +983,7 @@ function NewLoanForm({ formData, onChange, onSubmit, isSubmitting, goldPhoto, se
               ) : (
                 <input
                   required type={field.type} name={field.name} value={formData[field.name]} onChange={onChange} step={field.step}
+                  min={field.type === 'number' ? '0' : undefined}
                   placeholder={field.placeholder}
                   className="w-full bg-slate-900 border border-border-subtle text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-primary/20 outline-none hover:border-slate-700 transition-all placeholder:text-slate-700 font-medium"
                 />
@@ -1223,9 +1230,12 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onDelete, onPri
                <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Payment Amount (₹)</label>
                   <input 
-                    required type="number" 
+                    required type="number" min="0" step="0.01"
                     value={paymentFormData.amount} 
-                    onChange={e => setPaymentFormData({...paymentFormData, amount: e.target.value})}
+                    onChange={e => {
+                      if (parseFloat(e.target.value) < 0) return;
+                      setPaymentFormData({...paymentFormData, amount: e.target.value});
+                    }}
                     placeholder="Enter Interest Amount"
                     className="w-full bg-black border border-gray-800 text-gold-primary text-2xl font-black rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-gold-primary/30"
                   />
