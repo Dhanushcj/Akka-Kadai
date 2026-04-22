@@ -334,6 +334,17 @@ app.post('/api/loans/:id/payments', verifyToken, async (req, res) => {
     }
 });
 
+app.delete('/api/loans/:id', verifyToken, async (req, res) => {
+    try {
+        await connectDB();
+        const loan = await Loan.findOneAndDelete({ id: req.params.id });
+        if (!loan) return res.status(404).json({ message: 'Loan not found' });
+        res.json({ success: true, message: 'Loan deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/stats', verifyToken, async (req, res) => {
     try {
         await connectDB();
