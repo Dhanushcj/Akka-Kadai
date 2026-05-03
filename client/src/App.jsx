@@ -428,6 +428,8 @@ function App() {
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [currentLoanForHistory, setCurrentLoanForHistory] = useState(null)
   const [currentLoanForPayment, setCurrentLoanForPayment] = useState(null)
   const [paymentFormData, setPaymentFormData] = useState({ amount: '', description: 'Interest Payment' })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -737,6 +739,10 @@ function App() {
             onClearFilter={() => setSelectedCustomer(null)}
             isPaymentModalOpen={isPaymentModalOpen}
             setIsPaymentModalOpen={setIsPaymentModalOpen}
+            isHistoryModalOpen={isHistoryModalOpen}
+            setIsHistoryModalOpen={setIsHistoryModalOpen}
+            currentLoanForHistory={currentLoanForHistory}
+            setCurrentLoanForHistory={setCurrentLoanForHistory}
             currentLoanForPayment={currentLoanForPayment}
             setCurrentLoanForPayment={setCurrentLoanForPayment}
             paymentFormData={paymentFormData}
@@ -1084,7 +1090,14 @@ function NewLoanForm({ formData, onChange, onSubmit, isSubmitting, goldPhoto, se
   )
 }
 
-function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onDelete, onPrintReceipt, selectedCustomer, onClearFilter, isPaymentModalOpen, setIsPaymentModalOpen, currentLoanForPayment, setCurrentLoanForPayment, paymentFormData, setPaymentFormData, onPayment }) {
+function LoanList({ 
+  loans, searchTerm, setSearchTerm, onRelease, onDelete, onPrintReceipt, selectedCustomer, onClearFilter, 
+  isPaymentModalOpen, setIsPaymentModalOpen, 
+  isHistoryModalOpen, setIsHistoryModalOpen,
+  currentLoanForHistory, setCurrentLoanForHistory,
+  currentLoanForPayment, setCurrentLoanForPayment, 
+  paymentFormData, setPaymentFormData, onPayment 
+}) {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
@@ -1183,6 +1196,10 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onDelete, onPri
                     <span className="text-xs">📊</span>
                     <span className="text-[8px] font-bold uppercase">Stats</span>
                  </button>
+                 <button onClick={() => { setCurrentLoanForHistory(loan); setIsHistoryModalOpen(true); }} className="flex flex-col items-center gap-1 p-3 bg-slate-900 rounded-xl hover:bg-slate-800 text-slate-400 transition-all border border-border-subtle">
+                    <span className="text-xs">🕒</span>
+                    <span className="text-[8px] font-bold uppercase">History</span>
+                 </button>
                  {loan.status === 'Closed' && (
                    <button onClick={() => onPrintReceipt(loan, 'settlement')} className="flex flex-col items-center gap-1 p-3 bg-emerald-900/20 rounded-xl text-emerald-500 border border-emerald-500/10">
                       <span className="text-xs">✅</span>
@@ -1250,6 +1267,52 @@ function LoanList({ loans, searchTerm, setSearchTerm, onRelease, onDelete, onPri
         )}
       </div>
 
+      {isHistoryModalOpen && currentLoanForHistory && (
+        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsHistoryModalOpen(false)}>
+          <div className="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-8 py-6 border-b border-gray-800">
+               <div>
+                  <h3 className="text-xl font-black text-white">Payment History</h3>
+                  <p className="text-gold-primary text-[10px] font-black uppercase tracking-widest">{currentLoanForHistory.id} • {currentLoanForHistory.name}</p>
+               </div>
+               <button onClick={() => setIsHistoryModalOpen(false)} className="text-gray-500 hover:text-white transition-colors">✕</button>
+            </div>
+            
+            <div className="p-8 max-h-[60vh] overflow-y-auto">
+              {currentLoanForHistory.payments && currentLoanForHistory.payments.length > 0 ? (
+                <div className="space-y-4">
+                  {[...currentLoanForHistory.payments].reverse().map((p, idx) => (
+                    <div key={p.paymentId || idx} className="bg-black/40 border border-gray-800 p-5 rounded-2xl flex justify-between items-center group hover:border-gold-primary/30 transition-all">
+                       <div className="space-y-1">
+                          <div className="flex items-center gap-3">
+                             <span className="text-white font-black">₹{p.amount.toLocaleString()}</span>
+                             <span className="text-[10px] font-bold text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded uppercase tracking-tighter">{p.paymentId}</span>
+                          </div>
+                          <p className="text-xs text-gray-400 font-medium">{new Date(p.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} • {p.description}</p>
+                       </div>
+                       <button 
+                         onClick={() => onPrintReceipt(currentLoanForHistory, 'payment', p)}
+                         title="Print Receipt"
+                         className="p-3 bg-gold-primary/10 text-gold-primary rounded-xl hover:bg-gold-primary hover:text-black transition-all shadow-lg"
+                       >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                       </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                   <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">No interest payments found for this loan</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 bg-black/20 border-t border-gray-800 text-center">
+               <button onClick={() => setIsHistoryModalOpen(false)} className="text-gray-500 hover:text-white text-[10px] font-black uppercase tracking-widest">Close History View</button>
+            </div>
+          </div>
+        </div>
+      )}
       {isPaymentModalOpen && currentLoanForPayment && (
         <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsPaymentModalOpen(false)}>
           <div className="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-md shadow-2xl p-8" onClick={e => e.stopPropagation()}>
