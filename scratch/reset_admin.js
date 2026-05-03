@@ -14,7 +14,7 @@ async function resetAdmin() {
             password: String
         });
         const Settings = mongoose.models.Settings || mongoose.model('Settings', settingsSchema);
-        
+
         // Delete any existing global settings
         await Settings.deleteMany({ id: 'global' });
         console.log('Cleared existing settings');

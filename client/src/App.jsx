@@ -499,12 +499,19 @@ function App() {
     e.preventDefault()
     if (!currentLoanForPayment) return
     try {
-      await axios.post(`${API_BASE}/loans/${currentLoanForPayment.id}/payments`, paymentFormData)
+      const res = await axios.post(`${API_BASE}/loans/${currentLoanForPayment.id}/payments`, paymentFormData)
       setIsPaymentModalOpen(false)
       setPaymentFormData({ amount: '', description: 'Interest Payment' })
       fetchData()
+      
+      // Automatically generate receipt
+      if (res.data.loan && res.data.payment) {
+        printReceipt(res.data.loan, 'payment', res.data.payment)
+      }
+      
       alert('Interest Payment Recorded!')
     } catch (err) {
+      console.error('Payment Error:', err)
       alert('Error recording payment')
     }
   }
@@ -512,10 +519,17 @@ function App() {
   const handleRelease = async (loanId) => {
     if (window.confirm(`Are you sure you want to release loan ${loanId}?`)) {
       try {
-        await axios.put(`${API_BASE}/loans/${loanId}/release`)
+        const res = await axios.put(`${API_BASE}/loans/${loanId}/release`)
         fetchData()
+        
+        // Automatically generate settlement receipt
+        if (res.data && res.data.id) {
+          printReceipt(res.data, 'settlement')
+        }
+        
         alert('Loan Released Successfully!')
       } catch (err) {
+        console.error('Release Error:', err)
         alert('Error releasing loan')
       }
     }
