@@ -107,6 +107,13 @@ const getLoanState = (loan, targetDate = new Date()) => {
 };
 
 // Serve Static Files for Production
+// Disable caching for Service Worker to ensure updates are detected immediately
+app.get('/sw.js', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Content-Type', 'application/javascript');
+    next();
+});
+
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // API Routes
