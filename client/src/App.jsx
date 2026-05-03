@@ -1192,10 +1192,6 @@ function LoanList({
                     <span className="text-xs">🧾</span>
                     <span className="text-[8px] font-bold uppercase">Loan</span>
                  </button>
-                 <button onClick={() => onPrintReceipt(loan, 'interest')} className="flex flex-col items-center gap-1 p-3 bg-slate-900 rounded-xl hover:bg-slate-800 text-slate-400 transition-all border border-border-subtle">
-                    <span className="text-xs">📊</span>
-                    <span className="text-[8px] font-bold uppercase">Stats</span>
-                 </button>
                  <button onClick={() => { setCurrentLoanForHistory(loan); setIsHistoryModalOpen(true); }} className="flex flex-col items-center gap-1 p-3 bg-slate-900 rounded-xl hover:bg-slate-800 text-slate-400 transition-all border border-border-subtle">
                     <span className="text-xs">🕒</span>
                     <span className="text-[8px] font-bold uppercase">History</span>
@@ -1203,7 +1199,7 @@ function LoanList({
                  {loan.status === 'Closed' && (
                    <button onClick={() => onPrintReceipt(loan, 'settlement')} className="flex flex-col items-center gap-1 p-3 bg-emerald-900/20 rounded-xl text-emerald-500 border border-emerald-500/10">
                       <span className="text-xs">✅</span>
-                      <span className="text-[8px] font-bold uppercase">Record</span>
+                      <span className="text-[8px] font-bold uppercase">Settlement</span>
                    </button>
                  )}
                  <button onClick={() => onDelete(loan.id)} className="flex flex-col items-center gap-1 p-3 bg-red-900/20 rounded-xl hover:bg-red-900 text-red-500 hover:text-white transition-all border border-red-500/10">
@@ -1249,9 +1245,13 @@ function LoanList({
                   <button onClick={() => onPrintReceipt(loan, 'loan')} title="Print Receipt" className="p-2 bg-slate-800 text-slate-400 border border-border-subtle rounded-lg hover:text-white transition-all">
                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                   </button>
-                  {loan.status === 'Active' && (
+                                    {loan.status === 'Active' ? (
                     <button onClick={() => onRelease(loan.id)} title="Release Asset" className="p-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 rounded-lg hover:bg-emerald-500 hover:text-white transition-all">
                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    </button>
+                  ) : (
+                    <button onClick={() => onPrintReceipt(loan, 'settlement')} title="Reprint Settlement" className="p-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 rounded-lg hover:bg-emerald-500 hover:text-white transition-all">
+                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </button>
                   )}
                   <button onClick={() => onDelete(loan.id)} title="Delete Loan" className="p-2 bg-red-500/10 text-red-400 border border-red-500/10 rounded-lg hover:bg-red-500 hover:text-white transition-all">
