@@ -360,13 +360,34 @@ ${type === 'interest' ? `
 ${type==='settlement'?`
 <div class="sec"><div class="sec-title">Settlement Summary</div>
 <table class="tbl">
-  <tr><td>Principal Amount</td><td>${cur(loan.amount)}</td></tr>
+  <tr><td>Initial Principal Amount</td><td>${cur(loan.amount)}</td></tr>
   <tr><td>Loan Start Date</td><td>${fmt(loan.date)}</td></tr>
   <tr><td>Settlement Date</td><td>${fmt(loan.releasedDate)}</td></tr>
   <tr><td>Interest Rate</td><td>${loan.interest}% / month</td></tr>
-  <tr><td>Interest Charged</td><td>${cur(loan.finalInterest)}</td></tr>
-  <tr class="tr-total"><td>Total Settled Amount</td><td>${cur(loan.totalPaid)}</td></tr>
+  <tr><td>Total Interest Collected</td><td style="color:#cc0000;font-weight:900">${cur((loan.totalPaid || 0) - (loan.amount || 0))}</td></tr>
+  <tr class="tr-total"><td>Total Cumulative Payment</td><td>${cur(loan.totalPaid)}</td></tr>
 </table></div>
+
+${loan.payments && loan.payments.length > 0 ? `
+<div class="sec"><div class="sec-title">Transaction History</div>
+<table class="tbl" style="font-size:11px">
+  <tr style="font-weight:bold;color:#666;font-size:9px;text-transform:uppercase;letter-spacing:1px">
+    <td>Date</td><td>Ref.</td><td>Description</td><td style="text-align:right">Amount</td>
+  </tr>
+  ${loan.payments.map(p => `
+    <tr>
+      <td>${fmt(p.date)}</td>
+      <td style="font-size:10px;color:#999">${p.paymentId}</td>
+      <td>${p.description}</td>
+      <td style="text-align:right">${cur(p.amount)}</td>
+    </tr>
+  `).join('')}
+  <tr style="border-top:2px solid #D4AF37;font-weight:900;background:#fff9e6">
+    <td colspan="3" style="font-size:10px;text-transform:uppercase">Final Settlement Amount</td>
+    <td style="text-align:right">${cur((loan.totalPaid || 0) - (loan.payments || []).reduce((s,p)=>s+p.amount,0))}</td>
+  </tr>
+</table></div>` : ''}
+
 <div class="amt-box"><div class="amt-lbl">Total Settlement Amount Received</div>
   <div class="amt-val">${cur(loan.totalPaid)}</div><div class="amt-sub">Gold Released on ${fmt(loan.releasedDate)}</div>
 </div>

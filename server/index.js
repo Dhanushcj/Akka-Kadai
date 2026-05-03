@@ -212,7 +212,6 @@ app.put('/api/loans/:id/release', async (req, res) => {
         loan.releasedDate = releasedDate;
         loan.finalInterest = state.interestDue; 
         loan.totalPaid = (loan.totalPaid || 0) + state.outstanding; 
-        loan.amount = state.currentPrincipal; // Remaining principal at closing should be 0 ideally but store if needed
 
         const updatedLoan = await loan.save();
         res.json(updatedLoan);
@@ -236,6 +235,7 @@ app.post('/api/loans/:id/payments', async (req, res) => {
         };
 
         loan.payments.push(newPayment);
+        loan.totalPaid = (loan.totalPaid || 0) + parseFloat(amount);
         const savedLoan = await loan.save();
         res.status(201).json({ loan: savedLoan, payment: newPayment });
     } catch (err) {
