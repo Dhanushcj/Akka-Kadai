@@ -71,6 +71,34 @@ const getLoanState = (loan, targetDate = new Date()) => {
   }
 }
 
+const compressImage = (base64Str, maxWidth = 1000, maxHeight = 1000) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+  });
+};
+
 // ─── Receipt / PDF Generator ─────────────────────────────────────────────────
 const printReceipt = (loan, type, paymentData = null) => {
   const win = window.open('', '_blank', 'width=960,height=760')
@@ -865,10 +893,25 @@ function CameraModal({ captureMode, onCapture, onClose }) {
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d').drawImage(video, 0, 0)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    const maxWidth = 1000;
+    const maxHeight = 1000;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+    if (width > height) {
+      if (width > maxWidth) {
+        height *= maxWidth / width;
+        width = maxWidth;
+      }
+    } else {
+      if (height > maxHeight) {
+        width *= maxHeight / height;
+        height = maxHeight;
+      }
+    }
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(video, 0, 0, width, height)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop())
     }
@@ -928,7 +971,10 @@ function PhotoCapture({ label, icon, photo, setPhoto, captureMode }) {
     if (!file) return
     e.target.value = ''
     const reader = new FileReader()
-    reader.onloadend = () => setPhoto(reader.result)
+    reader.onloadend = async () => {
+      const compressed = await compressImage(reader.result)
+      setPhoto(compressed)
+    }
     reader.readAsDataURL(file)
   }
 

@@ -175,7 +175,7 @@ app.post('/api/loans', async (req, res) => {
     try {
         const { name, phone, weight, stoneWastage, purity, ornamentType, amount, interest, date, goldPhoto, customerPhoto } = req.body;
         
-        const loans = await Loan.find({ id: { $regex: /^L-/ } });
+        const loans = await Loan.find({ id: { $regex: /^L-/ } }, 'id').lean();
         let lastIdNum = 1000;
         if (loans.length > 0) {
             loans.forEach(loan => {
